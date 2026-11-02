@@ -185,9 +185,11 @@ private fun AppShell(store: AppStore, openBindingOnStart: Boolean, consumed: () 
         }
     }
 
+    val compactChatBar = WindowInsets.ime.getBottom(LocalDensity.current) > 0 &&
+        (tab == Tab.CLOUD || stack.lastOrNull() == Screen.ChatHome)
     Box(Modifier.fillMaxSize().background(colors.background)) {
         CompositionLocalProvider(
-            LocalBottomBarInset provides 88.dp,
+            LocalBottomBarInset provides if (compactChatBar) 72.dp else 88.dp,
             LocalAppNavigationState provides AppNavigationState(tab, selectTab),
         ) {
             Box(Modifier.fillMaxSize()) {
@@ -276,10 +278,11 @@ private fun AppShell(store: AppStore, openBindingOnStart: Boolean, consumed: () 
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                         .imePadding()
                         .windowInsetsPadding(WindowInsets.navigationBars)
-                        .padding(bottom = 10.dp),
+                        .padding(bottom = if (compactChatBar) 6.dp else 10.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     WatchBottomBar(selected = tab, dark = false, backdrop = bottomBarBackdrop,
+                        compact = compactChatBar,
                         onSelect = selectTab)
                 }
             }
@@ -346,7 +349,14 @@ private fun SecondLevelScreen(
         Screen.Binding -> BindingScreen(store, onBack)
         Screen.Appearance -> AppearanceScreen(store, onBack, onGallery)
         Screen.Settings -> SettingsScreen(store, onBack, onOpen)
-        Screen.ChatHistory -> ChatHistoryScreen(store, onBack)
+        Screen.ChatHistory -> ChatHistoryScreen(store, onBack,
+            onOpenMessage = { onOpen(Screen.ChatMessage(it)) })
+        is Screen.ChatMessage -> ChatScreen(store,
+            onOpenHistory = { onOpen(Screen.ChatHistory) },
+            onOpenMemory = { onOpen(Screen.CloudMemory) },
+            onOpenStyle = { onOpen(Screen.CloudStyle) },
+            onBack = onBack,
+            initialMessageId = screen.id)
         Screen.CloudMemory -> CloudMemoryScreen(store, onBack)
         Screen.CloudStyle -> CloudStyleScreen(store, onBack)
     }

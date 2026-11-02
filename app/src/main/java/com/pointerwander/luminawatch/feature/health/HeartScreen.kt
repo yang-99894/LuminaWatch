@@ -303,9 +303,11 @@ fun HeartScreen(store: AppStore, onBack: () -> Unit) {
 private fun HeartEducationCard(title: String, subtitle: String, imageRes: Int, cropY: Int) {
     val colors = LocalWatchColors.current
     val image = ImageBitmap.imageResource(imageRes)
+    var showDetail by remember { mutableStateOf(false) }
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(26.dp)).background(colors.surface),
+            .clip(RoundedCornerShape(26.dp)).background(colors.surface)
+            .motionClickable(onClick = { showDetail = true }),
     ) {
         Canvas(Modifier.fillMaxWidth().aspectRatio(1.67f)) {
             drawImage(
@@ -322,6 +324,17 @@ private fun HeartEducationCard(title: String, subtitle: String, imageRes: Int, c
             Spacer(Modifier.height(2.dp))
             Text(subtitle, color = colors.textPrimary, fontSize = 16.sp,
                 lineHeight = 23.sp)
+        }
+    }
+    if (showDetail) {
+        LiquidGlassBottomSheet(onDismiss = { showDetail = false },
+            surfaceColor = colors.surface) {
+            Text(title, color = colors.textPrimary, fontSize = 23.sp,
+                fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
+            Text(subtitle, color = colors.textSecondary, fontSize = 17.sp,
+                lineHeight = 25.sp)
+            Spacer(Modifier.height(24.dp))
         }
     }
 }

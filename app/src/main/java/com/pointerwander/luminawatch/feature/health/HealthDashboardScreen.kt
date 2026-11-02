@@ -102,6 +102,7 @@ import com.pointerwander.luminawatch.ui.PageColumn
 import com.pointerwander.luminawatch.ui.PageHeader
 import com.pointerwander.luminawatch.ui.PrimaryButton
 import com.pointerwander.luminawatch.feature.mood.MoodCloud
+import com.pointerwander.luminawatch.feature.mood.moodLabel
 import com.pointerwander.luminawatch.ui.SectionTitle
 
 private val pageGray = Color(0xFFF3F3F8)
@@ -114,6 +115,7 @@ fun HealthDashboardScreen(store: AppStore, onOpen: (Screen) -> Unit) {
     val buttonVisibleThreshold = with(LocalDensity.current) { 16.dp.roundToPx() }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
+    var showSummaryEditor by remember { mutableStateOf(false) }
     val searchFocus = remember { FocusRequester() }
     Box(Modifier.fillMaxSize().background(pageGray)) {
         // 只捕获页面内容，玻璃按钮作为兄弟浮层采样；不能把按钮捕获进自己的 backdrop。
@@ -138,11 +140,11 @@ fun HealthDashboardScreen(store: AppStore, onOpen: (Screen) -> Unit) {
         ) {
             Text("摘要", color = colors.textPrimary, fontSize = 34.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f))
-            LiquidGlassButton("编辑", { onOpen(Screen.SummaryEditor) }, height = 38.dp, filled = false)
+            LiquidGlassButton("编辑", { showSummaryEditor = true }, height = 38.dp, filled = false)
         }
         if (store.summaryItems.isEmpty()) {
             EmptyState("摘要还没有卡片", "点右上角“编辑”添加你想置顶的内容。", "编辑摘要") {
-                onOpen(Screen.SummaryEditor)
+                showSummaryEditor = true
             }
         } else {
             store.summaryItems.forEach { item ->
@@ -182,6 +184,9 @@ fun HealthDashboardScreen(store: AppStore, onOpen: (Screen) -> Unit) {
                 backdrop = backdrop,
                 onClick = { onOpen(Screen.AllWatches) },
             )
+        }
+        if (showSummaryEditor) {
+            SummaryEditorSheet(store) { showSummaryEditor = false }
         }
     }
 }
@@ -245,7 +250,7 @@ private fun SummaryPreviewCard(store: AppStore, item: SummaryItem, onClick: () -
     val value: String
     val unit: String
     val note: String
-    val time = sample?.timeLabel ?: "今天"
+    val time = sample?.timeLabel ?: if (item == SummaryItem.MOOD) mood?.timeLabel ?: "今天" else "今天"
     when (item) {
         SummaryItem.HEART -> {
             value = sample?.value?.toString() ?: "--"
@@ -282,9 +287,15 @@ private fun SummaryPreviewCard(store: AppStore, item: SummaryItem, onClick: () -
             note = "手机端记录尚未接入"
         }
         SummaryItem.MOOD -> {
-            value = mood?.words?.joinToString("、")?.ifBlank { "平静" } ?: "今天尚未记录"
+            value = mood?.words?.takeIf { it.isNotEmpty() }?.joinToString("、")
+                ?: mood?.let { moodLabel(it.value) } ?: "今天尚未记录"
             unit = ""
-            note = mood?.factors?.joinToString("、")?.ifBlank { "未选择影响因素" } ?: "未选择影响因素"
+            note = mood?.let { entry ->
+                listOfNotNull(
+                    entry.factors.takeIf { it.isNotEmpty() }?.joinToString("、"),
+                    entry.note.takeIf { it.isNotBlank() },
+                ).joinToString(" · ")
+            } ?: ""
         }
         SummaryItem.CARE -> {
             value = if (store.careEvents.isEmpty()) "暂无关怀记录" else "${store.careEvents.size} 条关怀记录"
@@ -380,53 +391,7 @@ private fun chartBuckets(values: List<Float>, count: Int): List<Float> {
 
 @Composable
 fun SummaryEditorScreen(store: AppStore, onBack: () -> Unit) {
-    val colors = LocalWatchColors.current
-    PageColumn(Modifier.background(pageGray)) {
-        PageHeader("编辑摘要", onBack = onBack)
-        Text("添加、移除或调整摘要卡片，不会删除记录。", color = colors.textSecondary, fontSize = 13.sp)
-        SectionTitle("已置顶")
-        if (store.summaryItems.isEmpty()) {
-            EmptyState("还没有置顶卡片", "从下方列表添加需要的健康项目。")
-        }
-        store.summaryItems.toList().forEachIndexed { index, item ->
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White)
-                    .padding(start = 16.dp, end = 5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(item.label, color = colors.textPrimary, fontSize = 16.sp,
-                    modifier = Modifier.weight(1f))
-                LiquidGlassSurface({ store.moveSummary(item, -1) },
-                    modifier = Modifier.size(48.dp), enabled = index > 0, height = 48.dp) { ink ->
-                    Text("↑", color = ink, fontSize = 22.sp)
-                }
-                LiquidGlassSurface({ store.moveSummary(item, 1) },
-                    modifier = Modifier.size(48.dp), enabled = index < store.summaryItems.lastIndex,
-                    height = 48.dp) { ink ->
-                    Text("↓", color = ink, fontSize = 22.sp)
-                }
-                LiquidGlassSurface({ store.setSummaryEnabled(item, false) },
-                    modifier = Modifier.size(48.dp), tint = colors.danger, height = 48.dp) { ink ->
-                    Text("−", color = ink, fontSize = 25.sp)
-                }
-            }
-        }
-        SectionTitle("可添加")
-        SummaryItem.entries.filter { it !in store.summaryItems }.forEach { item ->
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White)
-                    .motionClickable(onClick = { store.setSummaryEnabled(item, true) })
-                    .padding(horizontal = 16.dp, vertical = 17.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(item.label, color = colors.textPrimary, fontSize = 16.sp,
-                    modifier = Modifier.weight(1f))
-                Text("＋", color = Color(0xFF1767C6), fontSize = 22.sp)
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        PrimaryButton("完成", onBack, Modifier.fillMaxWidth())
-    }
+    SummaryEditorSheet(store, onBack)
 }
 
 @Composable
@@ -470,7 +435,7 @@ fun RunningHomeScreen(store: AppStore, onBack: () -> Unit) {
     FitnessTrainingScreen(store, onBack)
 }
 @Composable
-private fun HealthSearchBar(
+fun HealthSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     expanded: Boolean,
@@ -478,6 +443,7 @@ private fun HealthSearchBar(
     focusRequester: FocusRequester,
     backdrop: Backdrop? = null,
     modifier: Modifier = Modifier,
+    placeholder: String = "健康类别",
 ) {
     val colors = LocalWatchColors.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -530,7 +496,7 @@ private fun HealthSearchBar(
             ) {
                 Icon(Icons.Rounded.Search, null, tint = Color(0xFF0B0B0F), modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("健康类别", color = Color(0xFF8E8E93), fontSize = 20.sp, modifier = Modifier.weight(1f))
+                Text(placeholder, color = Color(0xFF8E8E93), fontSize = 20.sp, modifier = Modifier.weight(1f))
                 Box(
                     Modifier.size(34.dp).clip(CircleShape).clickable { startVoiceInput() },
                     contentAlignment = Alignment.Center,
@@ -564,7 +530,7 @@ private fun HealthSearchBar(
                     decorationBox = { inner ->
                         Box {
                             if (query.isEmpty()) {
-                                Text("健康类别", color = Color(0xFF8E8E93), fontSize = 17.sp)
+                                Text(placeholder, color = Color(0xFF8E8E93), fontSize = 17.sp)
                             }
                             inner()
                         }

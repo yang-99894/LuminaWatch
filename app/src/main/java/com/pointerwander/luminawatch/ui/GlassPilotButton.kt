@@ -24,6 +24,12 @@ fun AllWatchesGlassButton(
         height = 36.dp,
         tint = Color(0xFF0B0B0F),
         backdrop = backdrop,
+        filled = true,
+        fillAlpha = .88f,
+        border = Color.White.copy(alpha = .55f),
+        blurRadius = 8.dp,
+        refractionHeight = 7.dp,
+        refractionAmount = 12.dp,
     ) { ink ->
         Text("所有 Watch", color = ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
     }

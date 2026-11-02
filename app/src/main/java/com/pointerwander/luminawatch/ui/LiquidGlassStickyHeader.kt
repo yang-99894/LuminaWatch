@@ -88,6 +88,7 @@ fun LiquidGlassStickyHeader(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     onBack: (() -> Unit)? = null,
+    leadingIcon: ImageVector? = null,
     backdrop: Backdrop? = null,
     shape: Shape = RoundedCornerShape(1.dp),
     actions: @Composable RowScope.() -> Unit = {},
@@ -135,7 +136,9 @@ fun LiquidGlassStickyHeader(
         Box(Modifier.fillMaxWidth().height(66.dp).padding(horizontal = 16.dp)) {
             if (onBack != null) {
                 TopBarGlassCircle(onBack, source, Modifier.align(Alignment.CenterStart)) {
-                    BackChevron(Modifier.size(23.dp), ink)
+                    if (leadingIcon == null) BackChevron(Modifier.size(23.dp), ink)
+                    else Icon(leadingIcon, contentDescription = title, tint = ink,
+                        modifier = Modifier.size(23.dp))
                 }
             }
             Box(Modifier.align(Alignment.Center).fillMaxWidth().padding(horizontal = 72.dp),

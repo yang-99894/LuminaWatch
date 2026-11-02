@@ -399,7 +399,8 @@ private fun RenameWatchDialog(
     var text by remember(watch.id) { mutableStateOf(watch.name) }
     val colors = LocalWatchColors.current
     Dialog(onDismissRequest = onDismiss) {
-        LiquidGlassPanel(Modifier.fillMaxWidth()) {
+        com.pointerwander.luminawatch.ui.GlassDialogWindowBlur()
+        LiquidGlassPanel(Modifier.fillMaxWidth(), translucent = true) {
             Text("修改手表名称", color = companionText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(10.dp))
             OutlinedTextField(

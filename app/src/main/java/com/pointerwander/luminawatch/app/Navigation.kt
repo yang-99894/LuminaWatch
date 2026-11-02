@@ -46,6 +46,7 @@ sealed interface Screen {
     data object Appearance : Screen
     data object Settings : Screen
     data object ChatHistory : Screen
+    data class ChatMessage(val id: Long) : Screen
     data object CloudMemory : Screen
     data object CloudStyle : Screen
 }

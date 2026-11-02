@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -292,6 +293,7 @@ fun ActionRow(
     icon: ImageVector,
     onClick: () -> Unit,
     trailing: String? = null,
+    iconBackground: Color? = null,
 ) {
     val colors = LocalWatchColors.current
     Row(
@@ -300,10 +302,15 @@ fun ActionRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(colors.accentSoft),
+            Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).background(
+                if (iconBackground != null) Brush.verticalGradient(
+                    listOf(iconBackground.copy(alpha = .82f), iconBackground),
+                ) else Brush.verticalGradient(listOf(colors.accentSoft, colors.accentSoft)),
+            ),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, null, tint = colors.accent, modifier = Modifier.size(21.dp))
+            Icon(icon, null, tint = if (iconBackground != null) Color.White else colors.accent,
+                modifier = Modifier.size(21.dp))
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {

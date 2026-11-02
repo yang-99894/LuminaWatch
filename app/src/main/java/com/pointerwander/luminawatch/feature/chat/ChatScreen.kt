@@ -3,11 +3,13 @@ package com.pointerwander.luminawatch.feature.chat
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -36,7 +40,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,10 +62,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -77,9 +87,12 @@ import com.pointerwander.luminawatch.ui.LocalWatchColors
 import com.pointerwander.luminawatch.ui.LiquidGlassBottomSheet
 import com.pointerwander.luminawatch.ui.LiquidGlassButton
 import com.pointerwander.luminawatch.ui.LiquidGlassIconButton
+import com.pointerwander.luminawatch.ui.LiquidGlassSurface
+import com.pointerwander.luminawatch.ui.LiquidGlassStickyHeader
+import com.pointerwander.luminawatch.ui.LiquidGlassTopBarIconButton
 import com.pointerwander.luminawatch.ui.SurfaceCard
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -92,18 +105,26 @@ fun ChatScreen(
     onOpenMemory: () -> Unit,
     onOpenStyle: () -> Unit,
     onBack: (() -> Unit)? = null,
+    initialMessageId: Long? = null,
 ) {
     val colors = LocalWatchColors.current
     val context = LocalContext.current
-    val attachmentBackdrop = rememberLayerBackdrop()
+    val keyboard = LocalSoftwareKeyboardController.current
     var input by rememberSaveable { mutableStateOf("") }
+    var inputFocused by remember { mutableStateOf(false) }
+    val inputGlassAlpha by animateFloatAsState(
+        if (inputFocused) .96f else .84f, tween(180), label = "chatInputGlassFocus",
+    )
     var showMenu by remember { mutableStateOf(false) }
     var showAttach by remember { mutableStateOf(false) }
     var attachReady by remember { mutableStateOf(false) }
     var pendingImage by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
+    var focusedMessageId by remember(initialMessageId) { mutableStateOf(initialMessageId) }
     val scope = rememberCoroutineScope()
+    val inputFocusRequester = remember { FocusRequester() }
     val contextEvent = store.careEvent(store.activeCareContextId)
+    val headerBackdrop = rememberLayerBackdrop()
 
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -125,17 +146,22 @@ fun ChatScreen(
         if (input.isNotBlank()) store.sendMessage(input)
         pendingImage = null
         input = ""
+        focusedMessageId = null
         scope.launch {
             delay(650)
             store.completeReply()
         }
     }
 
-    LaunchedEffect(store.messages.size) {
-        if (store.messages.isNotEmpty()) listState.animateScrollToItem(store.messages.lastIndex)
+    LaunchedEffect(store.messages.size, focusedMessageId) {
+        if (store.messages.isNotEmpty()) {
+            val target = focusedMessageId?.let { id ->
+                store.messages.indexOfFirst { it.id == id }.takeIf { it >= 0 }
+            } ?: store.messages.lastIndex
+            if (focusedMessageId == null) listState.animateScrollToItem(target)
+            else listState.scrollToItem(target)
+        }
     }
-
-    BackHandler(enabled = showAttach) { showAttach = false }
 
     LaunchedEffect(showAttach) {
         if (showAttach) {
@@ -146,28 +172,12 @@ fun ChatScreen(
     }
 
     Box(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().layerBackdrop(attachmentBackdrop)) {
+        Box(Modifier.fillMaxSize().layerBackdrop(headerBackdrop)) {
             Column(
-                Modifier.fillMaxSize().padding(horizontal = 16.dp)
+                Modifier.fillMaxSize().imePadding().padding(horizontal = 16.dp)
                     .padding(bottom = LocalBottomBarInset.current),
             ) {
-                Row(
-                    Modifier.fillMaxWidth().height(62.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (onBack != null) {
-                        CircleIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "返回", onBack)
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    CloudImage(Modifier.size(42.dp), avatarId = store.avatarId)
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(store.cloudName, color = colors.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                        Text("陪你聊聊", color = colors.textSecondary, fontSize = 11.sp)
-                    }
-                    LiquidGlassIconButton(Icons.Rounded.MoreHoriz, "小云菜单",
-                        { showMenu = true }, size = 42.dp)
-                }
+                Spacer(Modifier.height(84.dp))
 
                 if (contextEvent != null) {
                     SurfaceCard {
@@ -193,10 +203,18 @@ fun ChatScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
+                    if (store.messages.isEmpty()) {
+                        item {
+                            Text("你好，我是${store.cloudName}。今天想聊点什么？",
+                                color = colors.textPrimary, fontSize = 17.sp, lineHeight = 27.sp,
+                                modifier = Modifier.padding(top = 24.dp, start = 8.dp, end = 8.dp))
+                        }
+                    }
                     items(store.messages.size) { index ->
-                        MessageBubble(store.messages[index]) {
+                        MessageBubble(store.messages[index],
+                            highlighted = store.messages[index].id == focusedMessageId) {
                             store.retryLastMessage()
                             scope.launch { delay(650); store.completeReply() }
                         }
@@ -210,62 +228,107 @@ fun ChatScreen(
                     AttachmentPreview(path) { pendingImage = null }
                 }
 
-                Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
-                        .background(colors.surfaceMuted).padding(horizontal = 6.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                LiquidGlassSurface(
+                    onClick = { inputFocusRequester.requestFocus() },
+                    modifier = Modifier.fillMaxWidth(),
+                    height = 62.dp,
+                    glassAlpha = inputGlassAlpha,
+                    border = colors.outline.copy(alpha = .55f),
+                    contentPadding = 6.dp,
                 ) {
-                    LiquidGlassIconButton(Icons.Rounded.Add, "添加照片",
-                        { showAttach = true }, size = 38.dp)
-                    Spacer(Modifier.width(4.dp))
-                    OutlinedTextField(
+                    LiquidGlassSurface(
+                        onClick = { keyboard?.hide(); showAttach = true },
+                        modifier = Modifier.size(46.dp), filled = true,
+                        tint = Color(0xFFEDEFE9), height = 46.dp,
+                        contentPadding = 0.dp,
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = "添加照片",
+                            tint = Color.Black, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    BasicTextField(
                         value = input,
                         onValueChange = { input = it },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).focusRequester(inputFocusRequester)
+                            .onFocusChanged { inputFocused = it.isFocused },
                         singleLine = true,
-                        shape = RoundedCornerShape(18.dp),
-                        placeholder = { Text("今天想聊点什么？", fontSize = 13.sp) },
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            color = colors.textPrimary, fontSize = 15.sp,
+                        ),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                         keyboardActions = KeyboardActions(onSend = { send() }),
+                        decorationBox = { innerTextField ->
+                            Box {
+                                if (input.isEmpty()) {
+                                    Text("今天想聊点什么？", color = colors.textSecondary, fontSize = 15.sp)
+                                }
+                                innerTextField()
+                            }
+                        },
                     )
-                    Spacer(Modifier.width(4.dp))
-                    LiquidGlassIconButton(Icons.Rounded.Mic, "语音输入", {
-                        Toast.makeText(context, "语音能力尚未接入", Toast.LENGTH_SHORT).show()
-                    }, size = 38.dp)
-                    Spacer(Modifier.width(4.dp))
-                    LiquidGlassIconButton(Icons.AutoMirrored.Rounded.Send, "发送消息",
-                        { send() }, filled = true, size = 42.dp)
+                    Spacer(Modifier.width(6.dp))
+                    if (input.isBlank() && pendingImage == null) {
+                        LiquidGlassSurface(
+                            onClick = {
+                                Toast.makeText(context, "语音能力尚未接入", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.size(46.dp), filled = true,
+                            tint = Color.Black, fillAlpha = 1f,
+                            height = 46.dp, contentPadding = 0.dp,
+                        ) {
+                            Canvas(Modifier.size(24.dp)) {
+                                val bars = floatArrayOf(8f, 15f, 21f, 14f, 8f)
+                                bars.forEachIndexed { index, height ->
+                                    val x = size.width * (.18f + index * .16f)
+                                    val half = height.dp.toPx() / 2f
+                                    drawLine(Color.White,
+                                        Offset(x, size.height / 2f - half),
+                                        Offset(x, size.height / 2f + half),
+                                        strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
+                                }
+                            }
+                        }
+                    } else {
+                        LiquidGlassIconButton(Icons.AutoMirrored.Rounded.Send, "发送消息",
+                            { send() }, filled = true, tint = Color.Black, size = 46.dp)
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
             }
         }
+        LiquidGlassStickyHeader(
+            title = store.cloudName,
+            onBack = onBack ?: onOpenHistory,
+            leadingIcon = if (onBack == null) Icons.Rounded.Menu else null,
+            backdrop = headerBackdrop,
+            actions = {
+                LiquidGlassTopBarIconButton(Icons.Rounded.Palette, "聊天风格", onOpenStyle,
+                    headerBackdrop)
+                Spacer(Modifier.width(8.dp))
+                LiquidGlassTopBarIconButton(Icons.Rounded.MoreHoriz, "小云菜单",
+                    { keyboard?.hide(); showMenu = true }, headerBackdrop)
+            },
+        )
 
-        if (showAttach) {
-            Box(
-                Modifier.fillMaxSize().background(Color.Black.copy(alpha = .22f))
-                    .clickable { showAttach = false },
+    }
+
+    if (showAttach) {
+        LiquidGlassBottomSheet(onDismiss = { showAttach = false }, surfaceColor = colors.surface) {
+            AttachmentSheet(
+                onDismiss = { showAttach = false },
+                onPickPhoto = {
+                    pickPhoto.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                onTakePhoto = { takePhoto.launch(null) },
+                enabled = attachReady,
             )
-            Box(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .padding(bottom = LocalBottomBarInset.current),
-            ) {
-                AttachmentSheet(
-                    onDismiss = { showAttach = false },
-                    onPickPhoto = {
-                        pickPhoto.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                        )
-                    },
-                    onTakePhoto = { takePhoto.launch(null) },
-                    enabled = attachReady,
-                    backdrop = attachmentBackdrop,
-                )
-            }
         }
     }
 
     if (showMenu) {
-        LiquidGlassBottomSheet(onDismiss = { showMenu = false }) {
+        LiquidGlassBottomSheet(onDismiss = { showMenu = false }, surfaceColor = colors.surface) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -277,13 +340,13 @@ fun ChatScreen(
             Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)) {
                 ActionRow("记忆", "查看小云记住的信息", Icons.Rounded.AutoAwesome, onClick = {
                     showMenu = false; onOpenMemory()
-                })
+                }, iconBackground = Color(0xFF7B61DC))
                 ActionRow("聊天记录", icon = Icons.Rounded.History, onClick = {
                     showMenu = false; onOpenHistory()
-                })
+                }, iconBackground = Color(0xFF1687E8))
                 ActionRow("聊天风格", "调整名称、性格与简介", Icons.Rounded.Palette, onClick = {
                     showMenu = false; onOpenStyle()
-                })
+                }, iconBackground = Color(0xFFE663A0))
                 Spacer(Modifier.height(22.dp))
             }
         }
@@ -291,7 +354,11 @@ fun ChatScreen(
 }
 
 @Composable
-private fun MessageBubble(message: ChatMessage, onRetry: () -> Unit) {
+private fun MessageBubble(
+    message: ChatMessage,
+    highlighted: Boolean = false,
+    onRetry: () -> Unit,
+) {
     val colors = LocalWatchColors.current
     Row(
         Modifier.fillMaxWidth(),
@@ -299,7 +366,6 @@ private fun MessageBubble(message: ChatMessage, onRetry: () -> Unit) {
     ) {
         Column(
             Modifier.fillMaxWidth(if (message.fromCloud) .96f else .82f)
-                .then(if (message.imageUri != null) Modifier.shadow(9.dp, RoundedCornerShape(20.dp)) else Modifier)
                 .clip(RoundedCornerShape(20.dp))
                 .background(
                     when {
@@ -308,8 +374,8 @@ private fun MessageBubble(message: ChatMessage, onRetry: () -> Unit) {
                         else -> colors.surfaceMuted
                     },
                 )
-                .then(if (message.imageUri != null) Modifier.border(
-                    1.5.dp, colors.textSecondary.copy(alpha = .32f), RoundedCornerShape(20.dp)) else Modifier)
+                .then(if (highlighted) Modifier.border(1.dp,
+                    colors.accent.copy(alpha = .48f), RoundedCornerShape(20.dp)) else Modifier)
                 .padding(horizontal = 13.dp, vertical = 10.dp),
         ) {
             message.imageUri?.let { path ->
@@ -319,7 +385,7 @@ private fun MessageBubble(message: ChatMessage, onRetry: () -> Unit) {
                         bitmap = bitmap,
                         contentDescription = "聊天照片",
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 160.dp)
                             .clip(RoundedCornerShape(14.dp)),
                     )
                     Spacer(Modifier.height(6.dp))

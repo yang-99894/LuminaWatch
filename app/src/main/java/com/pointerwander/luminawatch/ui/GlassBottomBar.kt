@@ -79,6 +79,7 @@ fun WatchBottomBar(
     dark: Boolean,
     backdrop: Backdrop,
     onSelect: (Tab) -> Unit,
+    compact: Boolean = false,
 ) {
     val accent = if (dark) Color(0xFFFFB14A) else Color(0xFF007AFF)
     // 参考浅色健康页：白色玻璃胶囊仍透出背景，选中项是独立的浅灰透镜。
@@ -119,8 +120,10 @@ fun WatchBottomBar(
         isSwitching = false
     }
 
+    val barHeight = if (compact) 48.dp else 64.dp
+    val lensHeight = if (compact) 42.dp else 58.dp
     BoxWithConstraints(
-        Modifier.width(280.dp).height(64.dp),
+        Modifier.width(280.dp).height(barHeight),
         contentAlignment = Alignment.CenterStart,
     ) {
         val tabWidth = with(LocalDensity.current) { (maxWidth - 6.dp).toPx() / Tab.entries.size }
@@ -139,7 +142,7 @@ fun WatchBottomBar(
 
         // 1. 真正可见的背景胶囊和普通 Tab 内容。
         Row(
-            Modifier.fillMaxWidth().height(64.dp)
+            Modifier.fillMaxWidth().height(barHeight)
                 .drawBackdrop(
                     backdrop = backdrop,
                     shape = { Capsule() },
@@ -151,7 +154,8 @@ fun WatchBottomBar(
                 .padding(3.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BottomTabContents(selected, dark, onSelect, previewScale = 1f, preview = false)
+            BottomTabContents(selected, dark, onSelect, previewScale = 1f, preview = false,
+                compact = compact)
         }
 
         // 2. 隐形染色副本；选中透镜从这里采样放大的图标和文字。
@@ -166,13 +170,14 @@ fun WatchBottomBar(
                     onDrawSurface = { drawRect(if (dark) Color.Black.copy(alpha = 0.5f)
                         else Color.White.copy(alpha = 0.5f)) },
                 )
-                .height(58.dp).fillMaxWidth()
+                .height(lensHeight).fillMaxWidth()
                 .padding(horizontal = 3.dp)
                 .graphicsLayer(colorFilter = ColorFilter.tint(accent)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             BottomTabContents(selected, dark, onSelect,
-                previewScale = lerp(1f, 1.18f, pressProgress), preview = true)
+                previewScale = lerp(1f, 1.18f, pressProgress), preview = true,
+                compact = compact)
         }
 
         // 3. 玻璃透镜在三个位置间移动；按住它横拖，松手吸附并切换页面。
@@ -235,7 +240,7 @@ fun WatchBottomBar(
                 .clickable(interactionSource = interactionSource, indication = null,
                     role = Role.Tab) { onSelect(selected) }
                 .semantics { this.selected = true; contentDescription = selected.label }
-                .height(58.dp).fillMaxWidth(1f / Tab.entries.size),
+                .height(lensHeight).fillMaxWidth(1f / Tab.entries.size),
         )
     }
 }
@@ -247,6 +252,7 @@ private fun RowScope.BottomTabContents(
     onSelect: (Tab) -> Unit,
     previewScale: Float,
     preview: Boolean,
+    compact: Boolean,
 ) {
     val ink = if (dark) Color(0xFFE4E4E7) else Color(0xFF0B0B0F)
     Tab.entries.forEach { tab ->
@@ -263,10 +269,12 @@ private fun RowScope.BottomTabContents(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Icon(tab.icon, contentDescription = null, tint = ink, modifier = Modifier.size(23.dp))
-            Spacer(Modifier.height(2.dp))
-            Text(tab.label, fontSize = 10.sp, lineHeight = 12.sp,
-                fontWeight = if (tab == selected) FontWeight.SemiBold else FontWeight.Medium,
-                color = ink, maxLines = 1)
+            if (!compact) {
+                Spacer(Modifier.height(2.dp))
+                Text(tab.label, fontSize = 10.sp, lineHeight = 12.sp,
+                    fontWeight = if (tab == selected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = ink, maxLines = 1)
+            }
         }
     }
 }

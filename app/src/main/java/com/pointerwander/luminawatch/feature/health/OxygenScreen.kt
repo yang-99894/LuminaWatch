@@ -994,15 +994,28 @@ private fun OxygenEducationCard(
     illustration: @Composable () -> Unit,
 ) {
     val colors = LocalWatchColors.current
+    var showDetail by remember { mutableStateOf(false) }
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(26.dp)).background(colors.surface),
+            .clip(RoundedCornerShape(26.dp)).background(colors.surface)
+            .motionClickable(onClick = { showDetail = true }),
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(1.67f)) { illustration() }
         Column(Modifier.padding(horizontal = 22.dp, vertical = 18.dp)) {
             Text(title, color = colors.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(subtitle, color = colors.textSecondary, fontSize = 16.sp)
+        }
+    }
+    if (showDetail) {
+        LiquidGlassBottomSheet(onDismiss = { showDetail = false },
+            surfaceColor = colors.surface) {
+            Text(title, color = colors.textPrimary, fontSize = 23.sp,
+                fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
+            Text(subtitle, color = colors.textSecondary, fontSize = 17.sp,
+                lineHeight = 25.sp)
+            Spacer(Modifier.height(24.dp))
         }
     }
 }

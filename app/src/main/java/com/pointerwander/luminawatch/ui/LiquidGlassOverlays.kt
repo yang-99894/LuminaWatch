@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,6 +31,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +50,27 @@ import com.kyant.backdrop.shadow.Shadow
 import com.kyant.shapes.RoundedRectangle
 import com.kyant.shapes.UnevenRoundedRectangle
 
+/** 对话框窗口的背景模糊，与底部玻璃弹层保持同一质感。 */
+@Composable
+fun GlassDialogWindowBlur() {
+    val view = LocalView.current
+    val blurPixels = with(LocalDensity.current) { 14.dp.toPx().toInt() }
+    DisposableEffect(view) {
+        val window = (view.parent as? DialogWindowProvider)?.window
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && window != null) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            val params = window.attributes
+            params.blurBehindRadius = blurPixels
+            window.attributes = params
+        }
+        onDispose {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && window != null) {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            }
+        }
+    }
+}
+
 /** 弹层玻璃容器；安全的兄弟图层可通过 [backdrop] 注入实时背景。 */
 @Composable
 fun LiquidGlassPanel(
@@ -55,7 +78,7 @@ fun LiquidGlassPanel(
     backdrop: Backdrop? = null,
     shape: Shape = RoundedRectangle(28.dp),
     surfaceColor: Color? = null,
-    translucent: Boolean = false,
+    translucent: Boolean = true,
     contentPadding: Dp = 20.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -75,8 +98,8 @@ fun LiquidGlassPanel(
             onDrawSurface = {
                 if (translucent) {
                     drawRect(Brush.verticalGradient(listOf(
-                        Color.White.copy(alpha = .96f),
-                        (surfaceColor ?: colors.surface).copy(alpha = .89f),
+                        (surfaceColor ?: colors.surface).copy(alpha = .58f),
+                        (surfaceColor ?: colors.surface).copy(alpha = .46f),
                     )))
                 } else {
                     drawRect((surfaceColor ?: colors.surface).copy(alpha = if (backdrop == null) .94f else .92f))
@@ -100,19 +123,22 @@ fun LiquidGlassBottomSheet(
     onDismiss: () -> Unit,
     fullHeight: Boolean = false,
     surfaceColor: Color? = null,
-    translucent: Boolean = false,
+    translucent: Boolean = !fullHeight,
+    sheetGesturesEnabled: Boolean = true,
     contentPadding: Dp = 20.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = if (fullHeight) (surfaceColor ?: LocalWatchColors.current.groupedSurface) else Color.Transparent,
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = .16f),
         dragHandle = null,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = fullHeight),
+        sheetGesturesEnabled = sheetGesturesEnabled,
         modifier = if (fullHeight) Modifier.fillMaxHeight() else Modifier,
     ) {
         val view = LocalView.current
-        val blurPixels = with(LocalDensity.current) { 36.dp.toPx().toInt() }
+        val blurPixels = with(LocalDensity.current) { 14.dp.toPx().toInt() }
         DisposableEffect(view, translucent) {
             val window = (view.parent as? DialogWindowProvider)?.window
             if (translucent && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && window != null) {
@@ -128,28 +154,44 @@ fun LiquidGlassBottomSheet(
             }
         }
         val navigation = LocalAppNavigationState.current
-        val sheetColor = surfaceColor ?: LocalWatchColors.current.groupedSurface
+        val sheetColor = surfaceColor ?: LocalWatchColors.current.surface
         val navBackdrop = rememberCanvasBackdrop { drawRect(sheetColor) }
+        DisposableEffect(view, sheetColor) {
+            val window = (view.parent as? DialogWindowProvider)?.window
+            val previousColor = window?.navigationBarColor
+            val previousContrast = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window?.isNavigationBarContrastEnforced
+            } else null
+            window?.navigationBarColor = sheetColor.toArgb()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window?.isNavigationBarContrastEnforced = false
+            }
+            onDispose {
+                if (previousColor != null) window?.navigationBarColor = previousColor
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && previousContrast != null) {
+                    window?.isNavigationBarContrastEnforced = previousContrast
+                }
+            }
+        }
         Box(Modifier.fillMaxWidth()
-            .then(if (fullHeight) Modifier.fillMaxHeight() else Modifier)
-            .background(if (translucent) Color.Transparent else sheetColor,
-                RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))) {
+            .then(if (fullHeight) Modifier.fillMaxHeight().padding(top = 28.dp) else Modifier)) {
             LiquidGlassPanel(
                 Modifier.fillMaxWidth()
-                    .then(if (fullHeight) Modifier.fillMaxHeight() else Modifier)
-                    .then(if (navigation != null) Modifier.padding(bottom = 88.dp) else Modifier),
+                    .then(if (fullHeight) Modifier.fillMaxHeight() else Modifier),
                 shape = UnevenRoundedRectangle(
                     topStart = 28.dp, topEnd = 28.dp, bottomEnd = 0.dp, bottomStart = 0.dp,
                 ),
-                surfaceColor = surfaceColor,
+                surfaceColor = sheetColor,
                 translucent = translucent,
                 contentPadding = contentPadding,
-                content = content,
+                content = {
+                    content()
+                    if (navigation != null) Spacer(Modifier.height(88.dp))
+                },
             )
             if (navigation != null) {
                 Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                     .then(if (fullHeight) Modifier else Modifier.padding(top = 12.dp))
-                    .then(if (translucent) Modifier.background(sheetColor.copy(alpha = .90f)) else Modifier)
                     .imePadding()
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(bottom = 10.dp), contentAlignment = Alignment.Center) {
@@ -172,7 +214,8 @@ fun LiquidGlassConfirmDialog(
 ) {
     val colors = LocalWatchColors.current
     Dialog(onDismissRequest = onDismiss) {
-        LiquidGlassPanel(Modifier.fillMaxWidth()) {
+        GlassDialogWindowBlur()
+        LiquidGlassPanel(Modifier.fillMaxWidth(), translucent = true) {
             Text(title, color = colors.textPrimary, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
             Text(message, color = colors.textSecondary, fontSize = 14.sp, lineHeight = 21.sp,
                 modifier = Modifier.padding(top = 10.dp, bottom = 20.dp))

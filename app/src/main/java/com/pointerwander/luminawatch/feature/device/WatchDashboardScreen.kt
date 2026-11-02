@@ -29,11 +29,13 @@ import androidx.compose.material.icons.rounded.Watch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -46,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.BasicTextField
 import com.pointerwander.luminawatch.app.Screen
+import com.pointerwander.luminawatch.feature.health.HealthSearchBar
 import com.pointerwander.luminawatch.data.AppStore
 import com.pointerwander.luminawatch.ui.LocalWatchColors
 import com.pointerwander.luminawatch.ui.LiquidGlassButton
@@ -59,6 +62,8 @@ private val watchBlue = Color(0xFF1478E8)
 fun WatchDashboardScreen(store: AppStore, onOpen: (Screen) -> Unit) {
     val colors = LocalWatchColors.current
     var query by rememberSaveable { mutableStateOf("") }
+    var searchExpanded by rememberSaveable { mutableStateOf(false) }
+    val searchFocus = remember { FocusRequester() }
     val pageScroll = rememberScrollState()
     val groups = listOf(
         "手表" to listOf(
@@ -92,25 +97,14 @@ fun WatchDashboardScreen(store: AppStore, onOpen: (Screen) -> Unit) {
         Text("手表", color = colors.textPrimary, fontSize = 34.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(top = 22.dp, bottom = 10.dp))
 
-        Row(
-            Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(15.dp))
-                .background(Color(0xFFE9E9EF)).padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Rounded.Search, null, tint = colors.textSecondary, modifier = Modifier.size(20.dp))
-            BasicTextField(
-                value = query, onValueChange = { query = it },
-                modifier = Modifier.weight(1f).padding(start = 10.dp), singleLine = true,
-                textStyle = TextStyle(color = colors.textPrimary, fontSize = 15.sp),
-                cursorBrush = SolidColor(watchBlue),
-                decorationBox = { inner ->
-                    if (query.isEmpty()) Text("搜索手表设置", color = colors.textSecondary, fontSize = 15.sp)
-                    inner()
-                },
-            )
-            if (query.isNotEmpty()) LiquidGlassButton("清除", { query = "" },
-                height = 36.dp, filled = false)
-        }
+        HealthSearchBar(
+            query = query,
+            onQueryChange = { query = it },
+            expanded = searchExpanded,
+            onExpandedChange = { searchExpanded = it },
+            focusRequester = searchFocus,
+            placeholder = "搜索手表设置",
+        )
 
         Spacer(Modifier.height(12.dp))
         var found = false

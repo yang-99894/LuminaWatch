@@ -22,10 +22,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Psychology
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -46,7 +44,9 @@ import com.pointerwander.luminawatch.data.AppStore
 import com.pointerwander.luminawatch.data.AssessmentRecord
 import com.pointerwander.luminawatch.ui.LiquidGlassBottomSheet
 import com.pointerwander.luminawatch.ui.LiquidGlassButton
+import com.pointerwander.luminawatch.ui.LiquidGlassConfirmDialog
 import com.pointerwander.luminawatch.ui.LiquidGlassIconButton
+import com.pointerwander.luminawatch.ui.LocalBottomBarInset
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -105,12 +105,12 @@ internal fun MentalAssessmentSheet(store: AppStore, onDismiss: () -> Unit) {
                 onDone = onDismiss)
         }
     }
-    if (showExitConfirmation) AlertDialog(
-        onDismissRequest = { showExitConfirmation = false },
-        title = { Text("退出问卷？") },
-        text = { Text("未提交的答案不会保存为评估记录。") },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("退出") } },
-        dismissButton = { TextButton(onClick = { showExitConfirmation = false }) { Text("继续答题") } },
+    if (showExitConfirmation) LiquidGlassConfirmDialog(
+        title = "退出问卷？",
+        message = "未提交的答案不会保存为评估记录。",
+        confirmLabel = "退出",
+        onConfirm = onDismiss,
+        onDismiss = { showExitConfirmation = false },
     )
 }
 
@@ -139,7 +139,7 @@ private fun AssessmentIntro(onClose: () -> Unit, onStart: () -> Unit, storageErr
             color = Color(0xFFAA3030), modifier = Modifier.padding(bottom = 12.dp))
         LiquidGlassButton("开始", onStart, Modifier.fillMaxWidth(), enabled = !storageError,
             tint = assessmentBlue)
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(24.dp + LocalBottomBarInset.current))
     }
 }
 
@@ -194,7 +194,8 @@ private fun AssessmentQuestion(
             }
         }
         Column(Modifier.fillMaxWidth().background(assessmentGroup)
-            .padding(horizontal = 22.dp, vertical = 16.dp)) {
+            .padding(horizontal = 22.dp, vertical = 16.dp)
+            .padding(bottom = LocalBottomBarInset.current)) {
             Text("${index + 1} / 16", color = assessmentMuted, fontSize = 14.sp,
                 modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
             if (index == 15 && selected == '-') {
@@ -231,7 +232,7 @@ private fun AssessmentConfirm(lastAnswered: Boolean, selfHarmConcern: Boolean,
         }
         Spacer(Modifier.weight(1f))
         LiquidGlassButton("完成并查看结果", onSubmit, Modifier.fillMaxWidth(), tint = assessmentBlue)
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(20.dp + LocalBottomBarInset.current))
     }
 }
 

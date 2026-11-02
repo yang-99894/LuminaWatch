@@ -4,41 +4,30 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pointerwander.luminawatch.ui.LocalWatchColors
 import com.pointerwander.luminawatch.ui.LiquidGlassButton
-import com.pointerwander.luminawatch.ui.LiquidGlassPanel
-import com.kyant.backdrop.Backdrop
-import com.kyant.shapes.UnevenRoundedRectangle
 import java.io.File
 
 /** 聊天附件面板：复用液态玻璃弹层和按钮。 */
@@ -48,16 +37,9 @@ fun AttachmentSheet(
     onPickPhoto: () -> Unit,
     onTakePhoto: () -> Unit,
     enabled: Boolean = true,
-    backdrop: Backdrop? = null,
 ) {
     val colors = LocalWatchColors.current
-    LiquidGlassPanel(
-        Modifier.fillMaxWidth(),
-        backdrop = backdrop,
-        shape = UnevenRoundedRectangle(
-            topStart = 28.dp, topEnd = 28.dp, bottomEnd = 0.dp, bottomStart = 0.dp,
-        ),
-    ) {
+    Column(Modifier.fillMaxWidth()) {
             Box(
                 Modifier.align(Alignment.CenterHorizontally)
                     .width(40.dp).height(4.dp)

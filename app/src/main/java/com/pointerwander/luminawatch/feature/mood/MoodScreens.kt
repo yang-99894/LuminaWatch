@@ -81,7 +81,7 @@ private val pleasantWords = listOf("开心", "兴奋", "放松", "满足", "有�
 private val unpleasantWords = listOf("疲惫", "焦虑", "委屈", "烦躁", "失落", "担心", "孤单", "压力大", "难过")
 private val moodFactors = listOf("工作", "学习", "家庭", "睡眠", "健康", "天气")
 
-private fun moodLabel(value: Float): String = when {
+internal fun moodLabel(value: Float): String = when {
     value >= .88f -> "非常愉快"
     value >= .72f -> "愉快"
     value >= .58f -> "有点愉快"
